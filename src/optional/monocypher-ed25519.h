@@ -126,12 +126,10 @@ int crypto_ed25519_check(const uint8_t  signature [64],
                          const uint8_t *message, size_t message_size);
 
 // Pre-hash variants
-void crypto_ed25519_ph_sign(uint8_t       signature   [64],
-                            const uint8_t secret_key  [64],
-                            const uint8_t message_hash[64]);
-int crypto_ed25519_ph_check(const uint8_t signature   [64],
-                            const uint8_t public_key  [32],
-                            const uint8_t message_hash[64]);
+void crypto_ed25519_ph_sign(uint8_t signature[64], const uint8_t secret_key[64],
+		const uint8_t message_hash[64], const uint8_t *ctx, uint8_t ctx_size);
+int crypto_ed25519_ph_check(const uint8_t sig[64], const uint8_t pk[32],
+		const uint8_t msg_hash[64], const uint8_t *ctx, uint8_t ctx_size);
 
 #ifdef __cplusplus
 }

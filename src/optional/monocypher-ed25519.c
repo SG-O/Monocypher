@@ -52,6 +52,7 @@
 // <https://creativecommons.org/publicdomain/zero/1.0/>
 
 #include "monocypher-ed25519.h"
+#include "commandIo/generateResponse.h"
 
 #ifdef MONOCYPHER_CPP_NAMESPACE
 namespace MONOCYPHER_CPP_NAMESPACE {
@@ -65,7 +66,9 @@ namespace MONOCYPHER_CPP_NAMESPACE {
 #define ZERO(buf, size)      FOR(_i_, 0, size) (buf)[_i_] = 0
 #define WIPE_CTX(ctx)        crypto_wipe(ctx   , sizeof(*(ctx)))
 #define WIPE_BUFFER(buffer)  crypto_wipe(buffer, sizeof(buffer))
+#ifndef MIN
 #define MIN(a, b)            ((a) <= (b) ? (a) : (b))
+#endif
 typedef uint8_t u8;
 typedef uint64_t u64;
 
@@ -477,20 +480,38 @@ int crypto_ed25519_check(const u8 signature[64], const u8 public_key[32],
 	return crypto_eddsa_check_equation(signature, public_key, h_ram);
 }
 
-static const u8 domain[34] = "SigEd25519 no Ed25519 collisions\1";
+//static const u8 domain[34] = "SigEd25519 no Ed25519 collisions\1";
+#define DOM2_PREFIX_LENGTH 32
+static const u8 DOM2_PREFIX[DOM2_PREFIX_LENGTH] = { 0x53, 0x69, 0x67, 0x45, 0x64, 0x32, 0x35, 0x35, 0x31, 0x39,
+    0x20, 0x6e, 0x6f, 0x20, 0x45, 0x64, 0x32, 0x35, 0x35, 0x31, 0x39, 0x20, 0x63, 0x6f, 0x6c, 0x6c, 0x69, 0x73,
+    0x69, 0x6f, 0x6e, 0x73 };
+
+void crypto_generate_dom(u8 *dom, u8 ph_flag, const u8 *ctx, u8 ctx_size) {
+	COPY(dom, DOM2_PREFIX, DOM2_PREFIX_LENGTH);
+	dom[DOM2_PREFIX_LENGTH] = ph_flag;
+	dom[DOM2_PREFIX_LENGTH + 1] = ctx_size;
+	COPY(&dom[DOM2_PREFIX_LENGTH + 2], ctx, ctx_size);
+	//gr_generateBytesDebug(10, de_sg_o_proto_miniknob_Level_DEBUG, dom, DOM2_PREFIX_LENGTH + 2 + ctx_size);
+}
 
 void crypto_ed25519_ph_sign(uint8_t signature[64], const uint8_t secret_key[64],
-                            const uint8_t message_hash[64])
+		const uint8_t message_hash[64], const u8 *ctx, u8 ctx_size)
 {
-	ed25519_dom_sign(signature, secret_key, domain, sizeof(domain),
+	size_t domain_size = DOM2_PREFIX_LENGTH + 2 + ctx_size;
+	u8 domain[domain_size];
+	crypto_generate_dom(domain, 0x01, ctx, ctx_size);
+	ed25519_dom_sign(signature, secret_key, domain, domain_size,
 	                 message_hash, 64);
 }
 
 int crypto_ed25519_ph_check(const uint8_t sig[64], const uint8_t pk[32],
-                            const uint8_t msg_hash[64])
+		const uint8_t msg_hash[64], const u8 *ctx, u8 ctx_size)
 {
 	u8 h_ram[32];
-	hash_reduce(h_ram, domain, sizeof(domain), sig, 32, pk, 32, msg_hash, 64);
+	size_t domain_size = DOM2_PREFIX_LENGTH + 2 + ctx_size;
+	u8 domain[domain_size];
+	crypto_generate_dom(domain, 0x01, ctx, ctx_size);
+	hash_reduce(h_ram, domain, domain_size, sig, 32, pk, 32, msg_hash, 64);
 	return crypto_eddsa_check_equation(sig, pk, h_ram);
 }
 
